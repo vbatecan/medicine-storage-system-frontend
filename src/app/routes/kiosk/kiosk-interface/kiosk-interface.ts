@@ -99,7 +99,7 @@ export class KioskInterface implements OnInit, OnDestroy {
   currentMode: 'face' | 'medicine' = 'face';
 
   // Medicine detection
-  medicineDetections: MedicineDetection[] = [];
+  medicineDetections = signal<MedicineDetection[]>([]);
 
   // System status
   isSystemOnline = true;
@@ -337,7 +337,7 @@ export class KioskInterface implements OnInit, OnDestroy {
         this.handleMedicineDetectionResults(response.results);
       } else {
         // Clear previous detections if no medicines found
-        this.medicineDetections = [];
+        this.medicineDetections.update(() => []);
       }
 
     } catch(error) {
@@ -380,7 +380,7 @@ export class KioskInterface implements OnInit, OnDestroy {
     } ));
 
     // Update detected medicines
-    this.medicineDetections = detectedMedicines;
+    this.medicineDetections.update(() => detectedMedicines);
 
     // Show success toast for new detections
     if(detectedMedicines.length > 0) {
@@ -407,7 +407,9 @@ export class KioskInterface implements OnInit, OnDestroy {
     });
 
     // Remove the medicine from detection results
-    this.medicineDetections = this.medicineDetections.filter(m => m.id !== medicine.id);
+    this.medicineDetections.update(value => {
+      return value.filter(m => m.id !== medicine.id);
+    });
 
     // Reset to face detection mode after dispensing
     setTimeout(() => {
@@ -422,7 +424,7 @@ export class KioskInterface implements OnInit, OnDestroy {
     this.isAuthenticated.update(() => false);
     this.authenticatedUser = null;
     this.currentMode = 'face';
-    this.medicineDetections = [];
+    this.medicineDetections.update(() => []);
     this.faceDetection = null;
 
     this.messageService.add({

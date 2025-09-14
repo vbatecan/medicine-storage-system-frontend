@@ -7,9 +7,11 @@
         <i class="icon" [ngClass]="getAuthIcon()"></i>
         <span class="status-text">{{ getAuthStatusText() }}</span>
       </div>
-      <div class="user-info" *ngIf="authenticatedUser">
-        <span class="welcome-text">Welcome, {{ authenticatedUser.name }}</span>
-      </div>
+      @if (authenticatedUser) {
+        <div class="user-info">
+          <span class="welcome-text">Welcome, {{ authenticatedUser.name }}</span>
+        </div>
+      }
     </div>
     <div class="system-title">
       <h1>Medicine Storage System</h1>
@@ -24,24 +26,26 @@
         <video #videoElement class="camera-feed" autoplay muted playsinline></video>
 
         <!-- Face detection bounding box overlay -->
-        <div class="bounding-box face-box"
-             *ngIf="faceDetection"
-             [style.left.px]="faceDetection.x"
-             [style.top.px]="faceDetection.y"
-             [style.width.px]="faceDetection.width"
-             [style.height.px]="faceDetection.height">
-          <span class="detection-label">{{ faceDetection.identity || 'Detecting...' }}</span>
-        </div>
+        @if (faceDetection) {
+          <div class="bounding-box face-box"
+               [style.left.px]="faceDetection.x"
+               [style.top.px]="faceDetection.y"
+               [style.width.px]="faceDetection.width"
+               [style.height.px]="faceDetection.height">
+            <span class="detection-label">{{ faceDetection.identity || 'Detecting...' }}</span>
+          </div>
+        }
 
         <!-- Medicine detection bounding boxes overlay -->
-        <div class="bounding-box medicine-box"
-             *ngFor="let medicine of medicineDetections"
-             [style.left.px]="medicine.bbox.x"
-             [style.top.px]="medicine.bbox.y"
-             [style.width.px]="medicine.bbox.width"
-             [style.height.px]="medicine.bbox.height">
-          <span class="detection-label">{{ medicine.name }}</span>
-        </div>
+        @for (medicine of medicineDetections(); track $index) {
+          <div class="bounding-box medicine-box"
+               [style.left.px]="medicine.bbox.x"
+               [style.top.px]="medicine.bbox.y"
+               [style.width.px]="medicine.bbox.width"
+               [style.height.px]="medicine.bbox.height">
+            <span class="detection-label">{{ medicine.name }}</span>
+          </div>
+        }
       </div>
 
       <!-- Camera status indicators -->
@@ -63,17 +67,19 @@
 
     <!-- Instructions panel -->
     <section class="instructions-section">
-      <div class="instruction-card" *ngIf="!isAuthenticated()">
-        <h3>Step 1: Face Authentication</h3>
-        <p>Please position your face in front of the camera for authentication.</p>
-        <ul>
-          <li>Look directly at the camera</li>
-          <li>Ensure good lighting</li>
-          <li>Wait for recognition</li>
-        </ul>
-      </div>
+      @if (!isAuthenticated()) {
+        <div class="instruction-card">
+          <h3>Step 1: Face Authentication</h3>
+          <p>Please position your face in front of the camera for authentication.</p>
+          <ul>
+            <li>Look directly at the camera</li>
+            <li>Ensure good lighting</li>
+            <li>Wait for recognition</li>
+          </ul>
+        </div>
+      }
 
-      <div class="instruction-card" *ngIf="isAuthenticated() && currentMode === 'medicine'">
+      @if (isAuthenticated() && currentMode === 'medicine') {
         <h3>Step 2: Medicine Detection</h3>
         <p>Hold the medicine package in front of the camera for identification.</p>
         <ul>
@@ -81,33 +87,40 @@
           <li>Ensure the label is readable</li>
           <li>Wait for classification</li>
         </ul>
-      </div>
+      }
     </section>
 
     <!-- Medicine detection results -->
-    <section class="results-section" *ngIf="isAuthenticated()">
-      <h3>Detection Results</h3>
-      <div class="medicine-results" *ngIf="medicineDetections.length > 0; else noDetections">
-        <div class="medicine-item" *ngFor="let medicine of medicineDetections">
-          <div class="medicine-info">
-            <h4>{{ medicine.name }}</h4>
-            <p class="medicine-details">{{ medicine.details }}</p>
-            <div class="confidence-scores">
-              <span class="confidence detection">Detection: {{ (medicine.confidence * 100).toFixed(1) }}%</span>
-              <span class="confidence classification">Classification: {{ (medicine.classifyConfidence * 100).toFixed(1) }}%</span>
-            </div>
+    @if (isAuthenticated()) {
+      <section class="results-section">
+        <h3>Detection Results</h3>
+        @if (medicineDetections().length > 0) {
+          <div class="medicine-results">
+            @for (medicine of medicineDetections(); track $index) {
+              <div class="medicine-item">
+                <div class="medicine-info">
+                  <h4>{{ medicine.name }}</h4>
+                  <p class="medicine-details">{{ medicine.details }}</p>
+                  <div class="confidence-scores">
+                    <span class="confidence detection">Detection: {{ (medicine.confidence * 100).toFixed(1) }}%</span>
+                    <span
+                      class="confidence classification">Classification: {{ (medicine.classifyConfidence * 100).toFixed(1) }}
+                      %</span>
+                  </div>
+                </div>
+                <div class="medicine-actions">
+                  <button class="btn-primary" (click)="dispenseMedicine(medicine)">
+                    Dispense
+                  </button>
+                </div>
+              </div>
+            }
           </div>
-          <div class="medicine-actions">
-            <button class="btn-primary" (click)="dispenseMedicine(medicine)">
-              Dispense
-            </button>
-          </div>
-        </div>
-      </div>
-      <ng-template #noDetections>
-        <p class="no-results">No medicine detected. Please hold a medicine package in front of the camera.</p>
-      </ng-template>
-    </section>
+        } @else {
+          <p class="no-results">No medicine detected. Please hold a medicine package in front of the camera.</p>
+        }
+      </section>
+    }
   </main>
 
   <!-- Footer with system status -->
