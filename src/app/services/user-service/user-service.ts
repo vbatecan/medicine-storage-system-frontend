@@ -11,11 +11,11 @@ export class UserService {
   private readonly API_URL = environment.apiUrl;
   private readonly http = inject(HttpClient);
 
-  getAllUsers(): Observable<ApiResponse<User[]>> {
-    return this.http.get<ApiResponse<User[]>>(`${this.API_URL}/users`);
+  getAllUsers(): Observable<User[]> {
+    return this.http.get<User[]>(`${ this.API_URL }/users/all`);
   }
 
-  createUser(userInput: UserInput, selfieImage: File): Observable<ApiResponse<User>> {
+  createUser(userInput: UserInput, selfieImage: File): Observable<User> {
     const formData = new FormData();
 
     // Add user data as form fields
@@ -28,18 +28,18 @@ export class UserService {
     // Add selfie image
     formData.append('selfie_image', selfieImage);
 
-    return this.http.post<ApiResponse<User>>(`${this.API_URL}/users/create`, formData);
+    return this.http.post<User>(`${ this.API_URL }/users/create`, formData);
   }
 
   getUserById(id: string): Observable<ApiResponse<User>> {
-    return this.http.get<ApiResponse<User>>(`${this.API_URL}/users/${id}`);
+    return this.http.get<ApiResponse<User>>(`${ this.API_URL }/users/${ id }`);
   }
 
   updateUser(id: string, userInput: Partial<UserInput>): Observable<ApiResponse<User>> {
-    return this.http.put<ApiResponse<User>>(`${this.API_URL}/users/${id}`, userInput);
+    return this.http.put<ApiResponse<User>>(`${ this.API_URL }/users/${ id }`, userInput);
   }
 
   deleteUser(id: string): Observable<ApiResponse<void>> {
-    return this.http.delete<ApiResponse<void>>(`${this.API_URL}/users/${id}`);
+    return this.http.delete<ApiResponse<void>>(`${ this.API_URL }/users/${ id }`);
   }
 }
