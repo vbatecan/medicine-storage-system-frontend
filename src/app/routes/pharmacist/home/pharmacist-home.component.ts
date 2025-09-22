@@ -14,9 +14,11 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
-import { Medicine, MedicineFormData, FileSelectEvent, StockSeverity } from '../../../models/interfaces';
+import { Medicine, MedicineFormData, FileSelectEvent, StockSeverity, CreateMedicineRequest } from '../../../models/interfaces';
 import { TextareaModule } from 'primeng/textarea';
 import { MedicineService } from '../../../services/medicine-service/medicine-service';
+import { HttpErrorResponse } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-pharmacist-home',
@@ -45,6 +47,7 @@ export class PharmacistHomeComponent {
   @ViewChild('medicineTable') medicineTable!: Table;
   @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
 
+  private readonly API_URL = environment.apiUrl;
   private fb = inject(FormBuilder);
   private messageService = inject(MessageService);
   private confirmationService = inject(ConfirmationService);
@@ -61,9 +64,7 @@ export class PharmacistHomeComponent {
   selectedThumbnailFile = signal<File | null>(null);
   selectedTrainingFiles = signal<File[]>([]);
 
-  // Computed values
   totalMedicines = computed(() => this.medicines().length);
-
   medicineForm: FormGroup;
 
   constructor() {
@@ -80,7 +81,14 @@ export class PharmacistHomeComponent {
     this.loading.set(true);
     this.medicineService.getAllMedicines().subscribe({
       next: (response) => {
-        this.medicines.set(response || []);
+        this.medicines.set(
+          response.map(medicine => {
+            return {
+              ...medicine,
+              image_path: `${this.API_URL}/medicines/${medicine.image_path}`
+            }
+          })
+        );
         this.loading.set(false);
       },
       error: (error) => {
@@ -120,15 +128,21 @@ export class PharmacistHomeComponent {
       header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
-        // Simulate delete - replace with actual service call
-        const currentMedicines = this.medicines();
-        const updatedMedicines = currentMedicines.filter(m => m.id !== medicine.id);
-        this.medicines.set(updatedMedicines);
+        this.medicineService.deleteMedicine(medicine.id).subscribe({
+          next: () => {
+            const currentMedicines = this.medicines();
+            const updatedMedicines = currentMedicines.filter(m => m.id !== medicine.id);
+            this.medicines.set(updatedMedicines);
 
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Medicine deleted successfully'
+            this.messageService.add({
+              severity: 'success',
+              summary: 'Success',
+              detail: 'Medicine deleted successfully'
+            });
+          },
+          error: (error) => {
+            console.error('Error deleting medicine:', error);
+          }
         });
       }
     });
@@ -139,7 +153,6 @@ export class PharmacistHomeComponent {
       const formData = this.medicineForm.value;
 
       if (this.isEditing()) {
-        // Update existing medicine
         const currentMedicines = this.medicines();
         const medicineIndex = currentMedicines.findIndex(m => m.id === this.selectedMedicine()?.id);
         if (medicineIndex !== -1) {
@@ -159,7 +172,7 @@ export class PharmacistHomeComponent {
         });
       } else {
         const newMedicine: Medicine = {
-          id: Date.now(), // Temporary ID generation
+          id: Date.now(),
           ...formData,
           image_path: this.thumbnailPreview() || 'https://picsum.photos/256'
         };
@@ -167,10 +180,44 @@ export class PharmacistHomeComponent {
         const currentMedicines = this.medicines();
         this.medicines.set([...currentMedicines, newMedicine]);
 
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Medicine added successfully'
+        // Medicine input
+        const thumbnailFile = this.selectedThumbnailFile();
+        if (!thumbnailFile) {
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Thumbnail image is required'
+          });
+          return;
+        }
+
+        const medicineInput: CreateMedicineRequest = {
+          name: formData.name,
+          description: formData.description,
+          stock: formData.stock,
+          thumbnail: thumbnailFile,
+          training_files: Array.from(this.selectedTrainingFiles())
+        }
+
+        this.medicineService.createMedicine(medicineInput).subscribe({
+          next: (response) => {
+            console.log(response);
+            const medicines = this.medicines();
+            this.medicines.set([...medicines, response]);
+            this.messageService.add({
+              severity: 'success',
+              summary: 'Success',
+              detail: 'Medicine added successfully'
+            });
+          },
+          error: (error: HttpErrorResponse) => {
+            console.error('Error adding medicine:', error);
+            this.messageService.add({
+              severity: 'error',
+              summary: 'Error',
+              detail: error.error.detail || 'Failed to add medicine'
+            });
+          }
         });
       }
 
@@ -214,7 +261,9 @@ export class PharmacistHomeComponent {
       this.selectedTrainingFiles.set(files);
       const previews: string[] = [];
 
-      files.forEach(file => {
+      console.log(files);
+      const fileArray = Array.from(files);
+      fileArray.forEach(file => {
         const reader = new FileReader();
         reader.onload = (e) => {
           previews.push(e.target?.result as string);

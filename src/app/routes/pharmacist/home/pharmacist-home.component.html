@@ -12,14 +12,16 @@
         label="Add New Medicine"
         icon="pi pi-plus"
         (onClick)="openNewMedicineDialog()"
-        class="p-button-success"
+        severity="success"
+        rounded
       >
       </p-button>
       <p-button
         label="Refresh"
         icon="pi pi-refresh"
         (onClick)="loadMedicines()"
-        class="p-button-outlined"
+        outlined
+        rounded
       >
       </p-button>
     </div>
@@ -102,25 +104,31 @@
               <p-button
                 icon="pi pi-eye"
                 (onClick)="viewMedicine(medicine)"
-                class="p-button-rounded p-button-outlined p-button-info"
                 pTooltip="View Details"
                 tooltipPosition="top"
+                severity="info"
+                rounded
+                outlined
               >
               </p-button>
               <p-button
                 icon="pi pi-pencil"
                 (onClick)="openEditMedicineDialog(medicine)"
-                class="p-button-rounded p-button-outlined p-button-warning"
                 pTooltip="Edit Medicine"
                 tooltipPosition="top"
+                severity="warn"
+                outlined
+                rounded
               >
               </p-button>
               <p-button
                 icon="pi pi-trash"
                 (onClick)="deleteMedicine(medicine)"
-                class="p-button-rounded p-button-outlined p-button-danger"
                 pTooltip="Delete Medicine"
                 tooltipPosition="top"
+                severity="danger"
+                outlined
+                rounded
               >
               </p-button>
             </div>
@@ -152,7 +160,6 @@
     [resizable]="false"
   >
     <form [formGroup]="medicineForm" (ngSubmit)="saveMedicine()" class="space-y-6">
-      <!-- Basic Information -->
       <div class="grid grid-cols-1 gap-4">
         <div>
           <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
@@ -212,11 +219,9 @@
         </div>
       </div>
 
-      <!-- File Uploads -->
       <div class="border-t pt-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Image Uploads</h3>
 
-        <!-- Thumbnail Upload -->
         <div class="mb-6">
           <label class="block text-sm font-medium text-gray-700 mb-2">
             @if (!isEditing()) { Thumbnail Image * } @else { Thumbnail Image (optional for updates)

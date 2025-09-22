@@ -12,5 +12,14 @@ export const routes: Routes = [
   {
     path: 'it-admin/home',
     loadComponent: () => import('./routes/it-admin/it-admin-home/it-admin-home').then(m => m.ItAdminHome)
+  },
+  {
+    path: 'login',
+    loadComponent: () => import('./routes/login/login').then(m => m.Login)
+  },
+  {
+    path: "**",
+    pathMatch: "full",
+    redirectTo: "kiosk/interface"
   }
 ];

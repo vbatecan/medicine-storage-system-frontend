@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { UserService } from '../../../services/user-service/user-service';
 import { User, UserInput } from '../../../models/interfaces';
+import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-it-admin-home',
@@ -95,7 +96,7 @@ export class ItAdminHome implements OnInit {
 
     const userInput: UserInput = this.userForm.value;
 
-    this.userService.createUser(userInput, this.selectedFile()!).subscribe({
+    this.userService.create(userInput, this.selectedFile()!).subscribe({
       next: (response) => {
         this.success.set('User registered successfully!');
         this.resetForm();
@@ -103,7 +104,7 @@ export class ItAdminHome implements OnInit {
         this.showRegistrationForm.set(false);
         this.loading.set(false);
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
         this.error.set('Error registering user: ' + ( err.error?.message || err.message ));
         this.loading.set(false);
       }

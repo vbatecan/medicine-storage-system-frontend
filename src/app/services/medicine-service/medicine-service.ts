@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ApiResponse, CreateMedicineRequest, Medicine } from "../../models/interfaces";
+import { CreateMedicineRequest, Medicine } from "../../models/interfaces";
 
 @Injectable({
   providedIn: 'root'
@@ -12,53 +12,44 @@ export class MedicineService {
   private apiUrl = environment.apiUrl;
 
   getAllMedicines() {
-    return this.http.get<Medicine[]>(`${this.apiUrl}/medicines/all`);
+    return this.http.get<Medicine[]>(`${ this.apiUrl }/medicines/all`);
   }
 
-  getMedicineById(id: number): Observable<ApiResponse<Medicine>> {
-    return this.http.get<ApiResponse<Medicine>>(`${this.apiUrl}/medicines/${id}`);
-  }
-
-  createMedicine(medicineData: CreateMedicineRequest): Observable<ApiResponse<Medicine>> {
+  createMedicine(medicineData: CreateMedicineRequest): Observable<Medicine> {
     const formData = new FormData();
 
-    // Add medicine data
     formData.append('name', medicineData.name);
     formData.append('description', medicineData.description);
     formData.append('stock', medicineData.stock.toString());
-
-    // Add thumbnail
     formData.append('thumbnail', medicineData.thumbnail);
-
-    // Add training images
-    medicineData.training_images.forEach((image: string | Blob, index: any) => {
-      formData.append(`training_image_${index}`, image);
+    medicineData.training_files.forEach((image: string | Blob, index: any) => {
+      formData.append(`training_files`, image);
     });
 
-    return this.http.post<ApiResponse<Medicine>>(`${this.apiUrl}/medicines`, formData);
+    return this.http.post<Medicine>(`${ this.apiUrl }/medicines/add?immediate_training=True`, formData);
   }
 
-  updateMedicine(id: number, medicineData: Partial<CreateMedicineRequest>): Observable<ApiResponse<Medicine>> {
+  updateMedicine(id: number, medicineData: Partial<CreateMedicineRequest>) {
     const formData = new FormData();
 
-    if (medicineData.name) formData.append('name', medicineData.name);
-    if (medicineData.description) formData.append('description', medicineData.description);
-    if (medicineData.stock !== undefined) formData.append('stock', medicineData.stock.toString());
+    if(medicineData.name) formData.append('name', medicineData.name);
+    if(medicineData.description) formData.append('description', medicineData.description);
+    if(medicineData.stock !== undefined) formData.append('stock', medicineData.stock.toString());
 
-    if (medicineData.thumbnail) {
+    if(medicineData.thumbnail) {
       formData.append('thumbnail', medicineData.thumbnail);
     }
 
-    if (medicineData.training_images) {
-      medicineData.training_images.forEach((image: string | Blob, index: any) => {
-        formData.append(`training_image_${index}`, image);
+    if(medicineData.training_files) {
+      medicineData.training_files.forEach((image: string | Blob, index: any) => {
+        formData.append(`training_image_${ index }`, image);
       });
     }
 
-    return this.http.put<ApiResponse<Medicine>>(`${this.apiUrl}/medicines/${id}`, formData);
+    return this.http.put<Medicine>(`${ this.apiUrl }/medicines/update/${ id }`, formData);
   }
 
-  deleteMedicine(id: number): Observable<ApiResponse<void>> {
-    return this.http.delete<ApiResponse<void>>(`${this.apiUrl}/medicines/${id}`);
+  deleteMedicine(id: number) {
+    return this.http.delete<{detail: string}>(`${ this.apiUrl }/medicines/delete/${ id }`);
   }
 }

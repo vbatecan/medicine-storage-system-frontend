@@ -1,9 +1,15 @@
+export enum UserRole {
+  PHARMACIST = "PHARMACIST",
+  IT_ADMIN = "IT_ADMIN",
+  USER = "USER"
+}
+
 export interface User {
   id?: string;
   face_name: string;
   email: string;
   is_active: boolean;
-  role: string;
+  role: UserRole;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -26,14 +32,7 @@ export interface CreateMedicineRequest {
   description: string;
   stock: number;
   thumbnail: File;
-  training_images: File[];
-}
-
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
+  training_files: File[];
 }
 
 export interface Medicine {
@@ -50,8 +49,8 @@ export interface MedicineFormData {
   name: string;
   description: string;
   stock: number;
-  thumbnail?: File;
-  trainingImages?: File[];
+  thumbnail: File | undefined;
+  training_files?: File[];
 }
 
 export interface FileSelectEvent {
