@@ -372,4 +372,73 @@
   .user-badges {
     flex-direction: row;
   }
+
+  .user-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* User Action Buttons */
+.user-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e9ecef;
+}
+
+.btn-toggle {
+  background-color: #6c757d;
+  color: white;
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.btn-activate {
+  background-color: #28a745;
+}
+
+.btn-activate:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.btn-deactivate {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.btn-deactivate:hover:not(:disabled) {
+  background-color: #e0a800;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

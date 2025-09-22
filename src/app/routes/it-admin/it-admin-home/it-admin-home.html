@@ -156,7 +156,6 @@
             }
           </div>
 
-          <!-- Submit Button -->
           <div class="form-actions">
             <button
               type="submit"
@@ -215,6 +214,49 @@
                 <small>Registered: {{ user.created_at | date:'medium' }}</small>
               </div>
             }
+
+            <!-- User Actions -->
+            <div class="user-actions">
+              <button
+                type="button"
+                class="btn btn-toggle"
+                [class.btn-activate]="!user.is_active"
+                [class.btn-deactivate]="user.is_active"
+                [disabled]="isUserBeingProcessed(user)"
+                (click)="toggleUserStatus(user)"
+                [title]="user.is_active ? 'Deactivate user' : 'Activate user'">
+                @if (isUserBeingProcessed(user)) {
+                  <span class="spinner"></span>
+                } @else {
+                  @if (user.is_active) {
+                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"/>
+                    </svg>
+                  } @else {
+                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  }
+                }
+                {{ user.is_active ? 'Deactivate' : 'Activate' }}
+              </button>
+
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="isUserBeingProcessed(user)"
+                (click)="deleteUser(user)"
+                title="Delete user permanently">
+                @if (isUserBeingProcessed(user)) {
+                  <span class="spinner"></span>
+                } @else {
+                  <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                }
+                Delete
+              </button>
+            </div>
           </div>
         }
       </div>

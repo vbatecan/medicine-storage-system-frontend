@@ -12,22 +12,26 @@ export class UserService {
   private readonly http = inject(HttpClient);
 
   getAllUsers(): Observable<User[]> {
-    return this.http.get<User[]>(`${ this.API_URL }/users/all`);
+    return this.http.get<User[]>(`${this.API_URL}/users/all`);
   }
 
   create(userInput: UserInput, selfieImage: File): Observable<User> {
     const formData = new FormData();
 
-    // Add user data as form fields
     formData.append('face_name', userInput.face_name);
     formData.append('email', userInput.email);
     formData.append('password', userInput.password);
     formData.append('is_active', userInput.is_active.toString());
     formData.append('role', userInput.role);
-
-    // Add selfie image
     formData.append('selfie_image', selfieImage);
+    return this.http.post<User>(`${this.API_URL}/users/create`, formData);
+  }
 
-    return this.http.post<User>(`${ this.API_URL }/users/create`, formData);
+  delete(userId: number) {
+    return this.http.delete<User>(`${this.API_URL}/users/delete/${userId}`);
+  }
+
+  toggleUserActiveStatus(userId: number, isActive: boolean) {
+    return this.http.patch<User>(`${this.API_URL}/users/toggle-active/${userId}`, { is_active: isActive });
   }
 }
