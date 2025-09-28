@@ -26,16 +26,16 @@ export class MedicineDetectionService {
       formData.append('image', imageBlob, 'medicine.jpg');
 
       const response = await firstValueFrom(this.http.post<MedicineDetectionResponse>(
-        `${ this.API_URL }/medicines/recognize`,
+        `${this.API_URL}/medicines/recognize`,
         formData
       ));
 
       console.log("Medicine Detection Response: ", response);
 
-      if(response?.results?.length > 0) {
+      if (response?.results?.length > 0) {
         this.handleMedicineDetectionResults(response.results, videoElement, videoWidth, videoHeight);
       }
-    } catch(error) {
+    } catch (error) {
       console.error('Medicine detection error:', error);
       this.messageService.add({
         severity: 'warn',
@@ -55,7 +55,7 @@ export class MedicineDetectionService {
     videoWidth: number,
     videoHeight: number
   ): void {
-    if(!videoElement || !videoElement.nativeElement) return;
+    if (!videoElement || !videoElement.nativeElement) return;
 
     const video = videoElement.nativeElement;
 
@@ -63,18 +63,18 @@ export class MedicineDetectionService {
     let scaleY = 1;
     let canCalculateBoundingBoxes = false;
 
-    if(video.getBoundingClientRect) {
+    if (video.getBoundingClientRect) {
       try {
         const videoRect = video.getBoundingClientRect();
 
-        if(videoRect.width > 0 && videoRect.height > 0) {
+        if (videoRect.width > 0 && videoRect.height > 0) {
           scaleX = videoRect.width / videoWidth;
           scaleY = videoRect.height / videoHeight;
           canCalculateBoundingBoxes = true;
         } else {
           console.warn('Video element has zero dimensions, cannot calculate bounding boxes');
         }
-      } catch(error) {
+      } catch (error) {
         console.warn('Error getting video bounding rect:', error);
       }
     } else {
@@ -83,9 +83,9 @@ export class MedicineDetectionService {
 
     const newDetections: MedicineDetection[] = results.map((result, index) => {
       const detection: MedicineDetection = {
-        id: `medicine_${ Date.now() }_${ index }`,
+        id: `medicine_${Date.now()}_${index}`,
         name: result.classify.product.charAt(0).toUpperCase() + result.classify.product.slice(1),
-        details: `Detected medicine with ${ ( result.detection.confidence * 100 ).toFixed(1) }% detection confidence`,
+        details: `Detected medicine with ${(result.detection.confidence * 100).toFixed(1)}% detection confidence`,
         confidence: result.detection.confidence,
         classifyConfidence: result.classify.confidence,
         bbox: canCalculateBoundingBoxes ? {
@@ -109,11 +109,11 @@ export class MedicineDetectionService {
     });
 
     const newMedicineNames = this.getNewlyDetectedMedicines(newDetections);
-    if(newMedicineNames.length > 0) {
+    if (newMedicineNames.length > 0) {
       this.messageService.add({
         severity: 'success',
         summary: 'New Medicines Detected',
-        detail: `Found: ${ newMedicineNames.join(', ') }`,
+        detail: `Found: ${newMedicineNames.join(', ')}`,
         life: 4000
       });
     }
@@ -128,27 +128,27 @@ export class MedicineDetectionService {
   ): MedicineDetection[] {
     const mergedDetections = [...currentDetections];
 
-    for(const newDetection of newDetections) {
+    for (const newDetection of newDetections) {
       const existingIndex = mergedDetections.findIndex(
         existing => existing.name.toLowerCase() === newDetection.name.toLowerCase()
       );
 
-      if(existingIndex >= 0) {
+      if (existingIndex >= 0) {
         const existing = mergedDetections[existingIndex];
-        const avgCurrentConfidence = ( existing.confidence + ( existing.classifyConfidence || 0 ) ) / 2;
-        const avgNewConfidence = ( newDetection.confidence + ( newDetection.classifyConfidence || 0 ) ) / 2;
+        const avgCurrentConfidence = (existing.confidence + (existing.classifyConfidence || 0)) / 2;
+        const avgNewConfidence = (newDetection.confidence + (newDetection.classifyConfidence || 0)) / 2;
 
-        if(avgNewConfidence > avgCurrentConfidence + this.CONFIDENCE_THRESHOLD) {
+        if (avgNewConfidence > avgCurrentConfidence + this.CONFIDENCE_THRESHOLD) {
           mergedDetections[existingIndex] = {
             ...newDetection,
             id: existing.id,
-            details: `Updated: ${ ( newDetection.confidence * 100 ).toFixed(1) }% confidence (improved)`
+            details: `Updated: ${(newDetection.confidence * 100).toFixed(1)}% confidence (improved)`
           };
 
           this.messageService.add({
             severity: 'info',
             summary: 'Detection Updated',
-            detail: `${ newDetection.name } detection improved to ${ ( avgNewConfidence * 100 ).toFixed(1) }%`,
+            detail: `${newDetection.name} detection improved to ${(avgNewConfidence * 100).toFixed(1)}%`,
             life: 2000
           });
         }
@@ -179,7 +179,7 @@ export class MedicineDetectionService {
     this.messageService.add({
       severity: 'success',
       summary: 'Medicine Dispensed',
-      detail: `${ medicine.name } has been dispensed from storage`,
+      detail: `${medicine.name} has been dispensed from storage`,
       life: 3000
     });
 
@@ -196,7 +196,7 @@ export class MedicineDetectionService {
     this.messageService.add({
       severity: 'success',
       summary: 'Medicine Added to Storage',
-      detail: `${ medicine.name } has been added to storage inventory`,
+      detail: `${medicine.name} has been added to storage inventory`,
       life: 3000
     });
 
@@ -211,23 +211,19 @@ export class MedicineDetectionService {
    * Remove medicine from detection list without any inventory action
    */
   removeFromDetection(medicine: MedicineDetection): void {
-    console.log('Removing medicine from detection:', medicine.name);
-
-    // Remove the medicine from detection results
+    console.debug('Removing medicine from detection:', medicine.name);
     this.medicineDetections.update(currentDetections => {
-      return currentDetections.filter(m => m.id !== medicine.id);
+      return currentDetections.filter(m => m.medicine?.name !== medicine.medicine?.name);
     });
 
-    // Show info message
     this.messageService.add({
       severity: 'info',
       summary: 'Medicine Removed',
-      detail: `${ medicine.name } removed from detection list`,
+      detail: `${medicine.name} removed from detection list`,
       life: 2000
     });
 
-    // If no medicines left, show helpful message
-    if(this.medicineDetections().length === 0) {
+    if (this.medicineDetections().length === 0) {
       this.messageService.add({
         severity: 'info',
         summary: 'No Medicines Detected',
@@ -251,67 +247,39 @@ export class MedicineDetectionService {
     });
   }
 
-  /**
-   * Reset all detections (used when resetting session)
-   */
   resetDetections(): void {
     this.medicineDetections.update(() => []);
   }
 
-  /**
-   * Check if currently processing
-   */
   isProcessing(): boolean {
-    // For simplicity, return false - in production this would track processing state
     return false;
   }
 
   /**
-   * Process frame for medicine detection
+   * Process frame for medicine detection using real video element
    */
-  async processFrame(frame: ImageData): Promise<any[] | null> {
+  async processFrameWithVideoElement(frame: ImageData, videoElement: ElementRef<HTMLVideoElement>): Promise<void> {
     try {
-      // Convert ImageData to Blob
       const canvas = document.createElement('canvas');
       canvas.width = frame.width;
       canvas.height = frame.height;
       const ctx = canvas.getContext('2d');
-      if(!ctx) return null;
+      if (!ctx) return;
 
       ctx.putImageData(frame, 0, 0);
 
       return new Promise((resolve) => {
-        canvas.toBlob(async(blob) => {
-          if(blob) {
-            // Create a mock video element for the API call
-            const mockVideoElement = {
-              nativeElement: {
-                videoWidth: frame.width,
-                videoHeight: frame.height
-              }
-            } as ElementRef<HTMLVideoElement>;
-
-            await this.processMedicineDetection(blob, mockVideoElement, frame.width, frame.height);
-            resolve(this.medicineDetections().map(detection => ( {
-              medicine: {
-                id: detection.id,
-                name: detection.name,
-                description: detection.details,
-                stock: 100, // Mock stock
-                image_path: ''
-              },
-              confidence: detection.confidence,
-              bbox: detection.bbox,
-              lastSeen: new Date()
-            } )));
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            await this.processMedicineDetection(blob, videoElement, frame.width, frame.height);
+            resolve();
           } else {
-            resolve(null);
+            resolve();
           }
         }, 'image/jpeg', 0.8);
       });
-    } catch(error) {
+    } catch (error) {
       console.error('Error processing frame for medicine detection:', error);
-      return null;
     }
   }
 
@@ -321,9 +289,8 @@ export class MedicineDetectionService {
   get detections$() {
     return {
       subscribe: (callback: (detections: any[] | null) => void) => {
-        // Simple implementation - in production would use proper observable
         const interval = setInterval(() => {
-          callback(this.medicineDetections().map(detection => ( {
+          callback(this.medicineDetections().map(detection => ({
             medicine: {
               id: detection.id,
               name: detection.name,
@@ -334,7 +301,7 @@ export class MedicineDetectionService {
             confidence: detection.confidence,
             bbox: detection.bbox,
             lastSeen: new Date()
-          } )));
+          })));
         }, 1000);
 
         return {
