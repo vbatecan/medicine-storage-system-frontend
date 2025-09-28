@@ -3,9 +3,9 @@ import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } 
 import { Router } from '@angular/router';
 import { AuthenticationService } from '../../services/authentication-service/authentication-service';
 import { LoginResponse } from '../../models/responses';
-import { UserRole } from '../../models/interfaces';
 import { MessageService } from 'primeng/api';
 import { Toast } from 'primeng/toast';
+import { UserRole } from '../../services/types';
 
 export interface LoginFormData {
   email: string;
