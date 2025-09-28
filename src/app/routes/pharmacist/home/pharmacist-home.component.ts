@@ -14,7 +14,7 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
-import { Medicine, MedicineFormData, FileSelectEvent, StockSeverity, CreateMedicineRequest } from '../../../models/interfaces';
+import { Medicine, MedicineFormData, FileSelectEvent, StockSeverity, CreateMedicineRequest } from '../../../models/io-types';
 import { TextareaModule } from 'primeng/textarea';
 import { MedicineService } from '../../../services/medicine-service/medicine-service';
 import { HttpErrorResponse } from '@angular/common/http';
