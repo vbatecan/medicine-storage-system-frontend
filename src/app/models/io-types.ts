@@ -1,19 +1,3 @@
-export enum UserRole {
-  PHARMACIST = "PHARMACIST",
-  IT_ADMIN = "IT_ADMIN",
-  USER = "USER"
-}
-
-export interface User {
-  id?: string;
-  face_name: string;
-  email: string;
-  is_active: boolean;
-  role: UserRole;
-  created_at?: Date;
-  updated_at?: Date;
-}
-
 export interface UserInput {
   face_name: string;
   email: string;
