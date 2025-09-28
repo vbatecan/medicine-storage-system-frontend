@@ -1,487 +1,338 @@
-import { Component, ElementRef, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom, interval, Subject, takeUntil } from 'rxjs';
-import { environment } from '../../../../environments/environment';
-import { Toast } from 'primeng/toast';
+import {
+  AfterViewInit,
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  OnDestroy,
+  OnInit,
+  signal,
+  ViewChild
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
+import { ButtonModule } from 'primeng/button';
+import { ToastModule } from 'primeng/toast';
+import { Subject, takeUntil } from 'rxjs';
 
-interface FaceDetection {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  identity?: string;
-  confidence?: number;
-}
-
-interface AuthenticatedUser {
-  name: string;
-  id: string;
-  permissions: string[];
-}
-
-interface MedicineDetectionResponse {
-  results: {
-    detection: {
-      label: string;
-      confidence: number;
-      bbox: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      };
-    };
-    classify: {
-      product: string;
-      confidence: number;
-    };
-  }[];
-}
-
-interface MedicineDetection {
-  name: string;
-  details: string;
-  confidence: number;
-  classifyConfidence: number;
-  id: string;
-  bbox: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-}
-
-interface FaceDetectionResult {
-  face: {
-    box: [number, number, number, number]; // [x, y, width, height]
-    left_eye: [number, number] | null;
-    right_eye: [number, number] | null;
-    confidence: number;
-  };
-  identity: string;
-  confidence: number;
-}
-
-type FaceRecognitionResponse = FaceDetectionResult[];
+import { CameraService } from '../../../services/camera.service';
+import { FaceRecognitionService } from '../../../services/face-recognition.service';
+import { MedicineDetectionService } from '../../../services/medicine-detection.service';
+import { SystemService } from '../../../services/system-service/system-service';
+import {
+  AccessLog, MedicineDetection, MedicineInteractionResponse,
+  SystemStatus,
+  User
+} from '../../../services/types';
+import { MedicineService } from '../../../services/medicine-service/medicine-service';
+import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-kiosk-interface',
-  imports: [CommonModule, Toast],
+  standalone: true,
+  imports: [CommonModule, FormsModule, ToastModule, ButtonModule],
   templateUrl: './kiosk-interface.html',
   styleUrl: './kiosk-interface.css',
   providers: [
     MessageService
   ]
 })
-export class KioskInterface implements OnInit, OnDestroy {
+export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('videoElement', { static: false }) videoElement!: ElementRef<HTMLVideoElement>;
 
-  // * API URL
-  private readonly API_URL = environment.apiUrl;
+  private cameraService = inject(CameraService);
+  private faceRecognitionService = inject(FaceRecognitionService);
+  private medicineDetectionService = inject(MedicineDetectionService);
+  private systemService = inject(SystemService);
+  private messageService = inject(MessageService);
+  private medicineService = inject(MedicineService);
 
-  // Camera and video properties
-  videoWidth = 640;
-  videoHeight = 480;
-  isCameraActive = false;
-  private mediaStream: MediaStream | null = null;
+  readonly authenticatedUser = signal<User | null>(null);
+  readonly currentDetections = signal<MedicineDetection[]>([]);
+  readonly systemStatus = signal<SystemStatus>({ isOnline: false, lastSync: new Date() });
+  readonly accessLogs = signal<AccessLog[]>([]);
+  readonly selectedMedicine = signal<MedicineDetection | null>(null);
 
-  // Authentication state
-  isAuthenticated = signal(false);
-  isAuthenticating = signal(false);
-  authenticatedUser: AuthenticatedUser | null = null;
-  faceDetection: FaceDetection | null = null;
+  readonly isCameraActive = computed(() => this.cameraService.isActive());
+  readonly isProcessing = computed(() =>
+    this.faceRecognitionService.isProcessing() ||
+    this.medicineDetectionService.isProcessing()
+  );
 
-  // Processing state
-  isProcessing = false;
-  currentMode: 'face' | 'medicine' = 'face';
+  readonly showAccessPanel = signal(false);
+  readonly showSystemPanel = signal(false);
 
-  // Medicine detection
-  medicineDetections = signal<MedicineDetection[]>([]);
-
-  // System status
-  isSystemOnline = true;
-  lastUpdateTime = new Date();
-
-  // Configuration
-  private readonly FRAME_PROCESSING_INTERVAL = 1000; // Process frame every 1 second
-
-  // RxJS subjects for cleanup
   private destroy$ = new Subject<void>();
-  private frameProcessing$ = new Subject<void>();
 
-  constructor(
-    private http: HttpClient,
-    private messageService: MessageService
-  ) {
-  }
-
-  async ngOnInit() {
-    await this.initializeCamera();
-    this.startFrameProcessing();
+  ngOnInit() {
     this.updateSystemStatus();
+    this.subscribeToServices();
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-    this.frameProcessing$.next();
-    this.frameProcessing$.complete();
-    this.stopCamera();
+    this.cameraService.stopCamera();
   }
 
-  /**
-   * Initialize camera and start video stream
-   */
-  private async initializeCamera(): Promise<void> {
-    try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: this.videoWidth },
-          height: { ideal: this.videoHeight },
-          facingMode: 'user'
-        },
-        audio: false
-      });
+  async ngAfterViewInit() {
+    await this.initializeCamera();
+    this.startProcessing();
+  }
 
-      if(this.videoElement && this.videoElement.nativeElement) {
-        this.videoElement.nativeElement.srcObject = this.mediaStream;
-        this.videoElement.nativeElement.onloadedmetadata = () => {
-          this.isCameraActive = true;
-          this.updateVideoDimensions();
-        };
-      }
+  private async initializeCamera() {
+    try {
+      await this.cameraService.initializeCamera(this.videoElement);
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Camera Ready',
+        detail: 'Camera initialized successfully'
+      });
     } catch(error) {
-      console.error('Error accessing camera:', error);
-      this.isCameraActive = false;
+      console.error('Error initializing camera:', error);
       this.messageService.add({
         severity: 'error',
         summary: 'Camera Error',
-        detail: 'Unable to access camera. Please check permissions.',
-        life: 5000
+        detail: 'Failed to initialize camera'
       });
     }
   }
 
-  /**
-   * Update video dimensions for bounding box calculations
-   */
-  private updateVideoDimensions(): void {
-    if(this.videoElement && this.videoElement.nativeElement) {
-      const video = this.videoElement.nativeElement;
-      this.videoWidth = video.videoWidth || this.videoWidth;
-      this.videoHeight = video.videoHeight || this.videoHeight;
-    }
-  }
-
-  /**
-   * Start frame processing for face recognition
-   */
-  private startFrameProcessing(): void {
-    interval(this.FRAME_PROCESSING_INTERVAL)
-      .pipe(takeUntil(this.frameProcessing$))
-      .subscribe(() => {
-        if(this.isCameraActive && !this.isProcessing) {
-          this.processCurrentFrame();
+  private startProcessing() {
+    this.cameraService.startFrameProcessing(this.videoElement)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(frame => {
+        if(frame) {
+          this.processFrame(frame);
         }
       });
   }
 
-  /**
-   * Process current video frame for face recognition
-   */
-  private async processCurrentFrame(): Promise<void> {
-    if(!this.videoElement || this.isProcessing) {
-      return;
-    }
-
-    this.isProcessing = true;
-
+  private async processFrame(frame: ImageData) {
     try {
-      const video = this.videoElement.nativeElement;
-
-      // Create a temporary canvas to capture the frame
-      const canvas = document.createElement('canvas');
-      canvas.width = this.videoWidth;
-      canvas.height = this.videoHeight;
-
-      const context = canvas.getContext('2d');
-      if(!context) {
-        this.isProcessing = false;
-        return;
+      let faceResult: User | null = null;
+      if(!this.isUserAuthenticated()) {
+        console.error("Logging in...");
+        faceResult = await this.faceRecognitionService.processFrame(frame)
       }
 
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if(faceResult && !this.isUserAuthenticated()) {
+        let userRole = 'GUEST';
 
-      canvas.toBlob(async(blob) => {
-        if(blob) {
-          if(!this.isAuthenticated()) {
-            await this.processFaceRecognition(blob);
-          } else if(this.currentMode === 'medicine') {
-            await this.processMedicineDetection(blob);
+        if(faceResult.role) {
+          if(faceResult.role.includes('IT_ADMIN') || faceResult.role.includes('admin')) {
+            userRole = 'IT_ADMIN';
+          } else if(faceResult.role.includes('PHARMACIST') || faceResult.role.includes('pharmacist')) {
+            userRole = 'PHARMACIST';
           }
         }
-        this.isProcessing = false;
-      }, 'image/jpeg', 0.8);
 
+        this.authenticatedUser.update(() => faceResult);
+        this.logAccess(faceResult);
+      } else {
+        const medicineResults = await this.medicineDetectionService.processFrame(frame);
+        if(medicineResults && medicineResults.length > 0) {
+          this.updateDetections(medicineResults);
+        }
+      }
     } catch(error) {
       console.error('Error processing frame:', error);
-      this.isProcessing = false;
     }
   }
 
-  private async processFaceRecognition(imageBlob: Blob): Promise<void> {
-    try {
-      this.isAuthenticating.update(() => true);
+  private updateDetections(newDetections: MedicineDetection[]) {
+    const currentDetections = this.currentDetections();
+    const updatedDetections = [...currentDetections];
 
-      const formData = new FormData();
-      formData.append('image', imageBlob, 'frame.jpg');
+    newDetections.forEach(newDetection => {
+      const existingIndex = updatedDetections.findIndex(
+        existing => existing.id === newDetection.id
+      );
 
-      const response = await firstValueFrom(this.http.post<FaceRecognitionResponse>(
-        `${ this.API_URL }/faces/recognize`,
-        formData
-      ));
-
-      console.log("Response: ", response);
-
-      if(response?.length && response[0].identity) {
-        this.handleSuccessfulAuthentication(response[0]);
+      if(existingIndex >= 0) {
+        if(newDetection.confidence > updatedDetections[existingIndex].confidence) {
+          updatedDetections[existingIndex] = {
+            ...newDetection,
+            lastSeen: new Date()
+          };
+        }
       } else {
-        this.handleFailedAuthentication();
+        // Add new detection
+        updatedDetections.push({
+          ...newDetection,
+          lastSeen: new Date()
+        });
       }
+    });
 
-    } catch(error) {
-      console.error('Face recognition API error:', error);
-      this.handleFailedAuthentication();
-    } finally {
-      this.isAuthenticating.update(() => false);
-    }
+    // Remove old detections (older than 5 seconds)
+    // const now = new Date();
+    // const filteredDetections = updatedDetections.filter(detection => {
+    //   const timeDiff = now.getTime() - detection.lastSeen.getTime();
+    //   return timeDiff < 5000; // 5 seconds
+    // });
+    //
+    this.currentDetections.update(() => updatedDetections);
   }
 
-  /**
-   * Handle successful face authentication
-   */
-  private handleSuccessfulAuthentication(response: FaceDetectionResult): void {
-    this.isAuthenticated.update(() => true);
-    this.authenticatedUser = {
-      name: response.identity!,
-      id: `user_${ Date.now() }`,
-      permissions: ['medicine_access']
+  private subscribeToServices() {
+    // For now, we'll handle state updates manually during frame processing
+    // In a production app, these would be proper RxJS observables
+    console.log('Service subscriptions would be set up here');
+  }
+
+  private logAccess(user: User) {
+    const accessLog: AccessLog = {
+      id: Date.now().toString(),
+      userId: user.id || 'unknown',
+      email: user.email,
+      faceName: user.face_name,
+      timestamp: new Date(),
+      action: 'face_recognition_success'
     };
 
-    if(response.face && this.videoElement) {
-      const video = this.videoElement.nativeElement;
-      const videoRect = video.getBoundingClientRect();
-
-      const scaleX = videoRect.width / this.videoWidth;
-      const scaleY = videoRect.height / this.videoHeight;
-
-      this.faceDetection = {
-        x: response.face.box[0] * scaleX,
-        y: response.face.box[1] * scaleY,
-        width: response.face.box[2] * scaleX,
-        height: response.face.box[3] * scaleY,
-        identity: response.identity,
-        confidence: response.confidence
-      };
-    }
-
-    this.messageService.add({
-      severity: 'success',
-      summary: 'Authentication Successful',
-      detail: `Welcome, ${ response.identity }!`,
-      life: 4000
-    });
-
-    setTimeout(() => {
-      this.currentMode = 'medicine';
-      this.faceDetection = null;
-      this.messageService.add({
-        severity: 'info',
-        summary: 'Medicine Detection Mode',
-        detail: 'Please hold medicine package in front of camera',
-        life: 3000
-      });
-    }, 3000);
-
-    this.lastUpdateTime = new Date();
+    this.accessLogs.update(logs => [accessLog, ...logs.slice(0, 9)]);
   }
 
-  /**
-   * Handle failed authentication
-   */
-  private handleFailedAuthentication(): void {
-    this.faceDetection = null;
-    this.isAuthenticated.update(() => false);
-    this.authenticatedUser = null;
-  }
-
-  /**
-   * Process medicine detection with real API call
-   */
-  private async processMedicineDetection(imageBlob: Blob): Promise<void> {
-    try {
-      const formData = new FormData();
-      formData.append('image', imageBlob, 'medicine.jpg');
-
-      const response = await firstValueFrom(this.http.post<MedicineDetectionResponse>(
-        `${ this.API_URL }/medicines/recognize`,
-        formData
-      ));
-
-      console.log("Medicine Detection Response: ", response);
-
-      if(response?.results?.length > 0) {
-        this.handleMedicineDetectionResults(response.results);
-      } else {
-        // Clear previous detections if no medicines found
-        this.medicineDetections.update(() => []);
+  private updateSystemStatus() {
+    this.systemService.getSystemStatus().subscribe({
+      next: (status: {ok: boolean}) => {
+        this.systemStatus.set({
+          isOnline: status.ok,
+          lastSync: new Date()
+        });
+      },
+      error: (error) => {
+        console.error('Error fetching system status:', error);
+        this.systemStatus.set({ isOnline: false, lastSync: new Date() });
       }
-
-    } catch(error) {
-      console.error('Medicine detection error:', error);
-      this.messageService.add({
-        severity: 'warn',
-        summary: 'Detection Error',
-        detail: 'Unable to detect medicines. Please try again.',
-        life: 3000
-      });
-    }
-  }
-
-  /**
-   * Handle medicine detection results from API
-   */
-  private handleMedicineDetectionResults(results: MedicineDetectionResponse['results']): void {
-    if(!this.videoElement) return;
-
-    const video = this.videoElement.nativeElement;
-    const videoRect = video.getBoundingClientRect();
-
-    // Calculate scaling factors for bounding boxes
-    const scaleX = videoRect.width / this.videoWidth;
-    const scaleY = videoRect.height / this.videoHeight;
-
-    // Convert API results to our MedicineDetection format
-    const detectedMedicines: MedicineDetection[] = results.map((result, index) => ( {
-      id: `medicine_${ Date.now() }_${ index }`,
-      name: result.classify.product.charAt(0).toUpperCase() + result.classify.product.slice(1),
-      details: `Detected medicine with ${ ( result.detection.confidence * 100 ).toFixed(1) }% detection confidence`,
-      confidence: result.detection.confidence,
-      classifyConfidence: result.classify.confidence,
-      bbox: {
-        x: result.detection.bbox.x * scaleX,
-        y: result.detection.bbox.y * scaleY,
-        width: result.detection.bbox.width * scaleX,
-        height: result.detection.bbox.height * scaleY
-      }
-    } ));
-
-    // Update detected medicines
-    this.medicineDetections.update(() => detectedMedicines);
-
-    // Show success toast for new detections
-    if(detectedMedicines.length > 0) {
-      this.messageService.add({
-        severity: 'success',
-        summary: 'Medicines Detected',
-        detail: `Found ${ detectedMedicines.length } medicine(s): ${ detectedMedicines.map(m => m.name).join(', ') }`,
-        life: 4000
-      });
-    }
-  }
-
-  /**
-   * Handle medicine dispensing
-   */
-  dispenseMedicine(medicine: MedicineDetection): void {
-    console.log('Dispensing medicine:', medicine.name);
-
-    this.messageService.add({
-      severity: 'success',
-      summary: 'Medicine Dispensed',
-      detail: `${ medicine.name } has been dispensed successfully`,
-      life: 3000
     });
-
-    // Remove the medicine from detection results
-    this.medicineDetections.update(value => {
-      return value.filter(m => m.id !== medicine.id);
-    });
-
-    // Reset to face detection mode after dispensing
-    setTimeout(() => {
-      this.resetToFaceDetection();
-    }, 2000);
   }
 
-  /**
-   * Reset system to face detection mode
-   */
-  private resetToFaceDetection(): void {
-    this.isAuthenticated.update(() => false);
-    this.authenticatedUser = null;
-    this.currentMode = 'face';
-    this.medicineDetections.update(() => []);
-    this.faceDetection = null;
+  selectMedicine(medicine: MedicineDetection) {
+    this.selectedMedicine.set(medicine);
+  }
+
+  clearSelection() {
+    this.selectedMedicine.set(null);
+  }
+
+  toggleAccessPanel() {
+    this.showAccessPanel.update(show => !show);
+  }
+
+  toggleSystemPanel() {
+    this.showSystemPanel.update(show => !show);
+  }
+
+  refreshCamera() {
+    this.cameraService.stopCamera();
+    this.initializeCamera();
+  }
+
+  logout() {
+    this.authenticatedUser.set(null);
+    this.currentDetections.set([]);
+    this.selectedMedicine.set(null);
+    this.showAccessPanel.set(false);
+    this.showSystemPanel.set(false);
 
     this.messageService.add({
       severity: 'info',
-      summary: 'Session Reset',
-      detail: 'Please authenticate again for medicine access',
-      life: 3000
+      summary: 'Logged Out',
+      detail: 'User session ended'
     });
   }
 
-  /**
-   * Stop camera and clean up resources
-   */
-  private stopCamera(): void {
-    if(this.mediaStream) {
-      this.mediaStream.getTracks().forEach(track => track.stop());
-      this.mediaStream = null;
-    }
-    this.isCameraActive = false;
+  dispenseMedicine(detection: MedicineDetection) {
+    this.selectMedicine(detection);
+    const medicineName = detection.medicine?.name || detection.name;
+
+    this.medicineService.dispenseMedicine(medicineName, 1).subscribe({
+      next: (response) => {
+        console.log('Medicine dispensed:', response);
+        this.removeFromDetection(detection);
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Medicine Dispensed',
+          detail: `${ medicineName } has been dispensed from storage`,
+          life: 3000
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        console.error('Error dispensing medicine:', err);
+        const errorMsg = err.error?.detail || 'An error occurred while dispensing the medicine.';
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Dispense Error',
+          detail: errorMsg,
+          life: 5000
+        });
+      }
+    });
   }
 
-  /**
-   * Update system status periodically
-   */
-  private updateSystemStatus(): void {
-    interval(5000)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.lastUpdateTime = new Date();
-        // TODO: Add actual system health checks
-        this.isSystemOnline = navigator.onLine;
-      });
+  addToStorage(detection: MedicineDetection) {
+    this.selectMedicine(detection);
+    const medicineName = detection.medicine?.name || detection.name;
+
+    this.medicineService.addStock(medicineName, 1).subscribe({
+      next: (response: MedicineInteractionResponse) => {
+        console.log('Stock added:', response);
+        this.removeFromDetection(detection);
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Medicine Added',
+          detail: `${ medicineName } has been added to storage`,
+          life: 3000
+        });
+      },
+      error: (error: HttpErrorResponse) => {
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Add Stock Error',
+          detail: error.error?.detail || 'An error occurred while adding stock.',
+          life: 5000
+        })
+      }
+    })
   }
 
-  /**
-   * Get authentication status icon class
-   */
-  getAuthIcon(): string {
-    if(this.isAuthenticated()) {
-      return 'fas fa-check-circle';
-    } else if(this.isAuthenticating()) {
-      return 'fas fa-spinner fa-spin';
-    } else {
-      return 'fas fa-user-circle';
+  removeFromDetection(detection: MedicineDetection) {
+    this.currentDetections.update(detections =>
+      detections.filter(d => d.id !== detection.id)
+    );
+
+    if(this.selectedMedicine() === detection) {
+      this.clearSelection();
     }
+
+    const medicineName = detection.medicine?.name || detection.name;
+
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Detection Removed',
+      detail: `${ medicineName } removed from detection list`,
+      life: 2000
+    });
   }
 
-  /**
-   * Get authentication status text
-   */
-  getAuthStatusText(): string {
-    if(this.isAuthenticated()) {
-      return 'Authenticated';
-    } else if(this.isAuthenticating()) {
-      return 'Authenticating...';
-    } else {
-      return 'Not Authenticated';
-    }
+  readonly detectionCount = computed(() => this.currentDetections().length);
+  readonly isUserAuthenticated = computed(() => this.authenticatedUser() !== null);
+  readonly userName = computed(() => this.authenticatedUser()?.face_name || 'Unknown User');
+  readonly userRole = computed(() => this.authenticatedUser()?.role || 'guest');
+
+  getMedicineStatusClass(medicine: MedicineDetection): string {
+    if(medicine.confidence > 0.8) return 'high-confidence';
+    if(medicine.confidence > 0.6) return 'medium-confidence';
+    return 'low-confidence';
+  }
+
+  formatTimestamp(date: Date): string {
+    return new Intl.DateTimeFormat('en-US', {
+      timeStyle: 'medium',
+      dateStyle: 'short'
+    }).format(date);
   }
 }

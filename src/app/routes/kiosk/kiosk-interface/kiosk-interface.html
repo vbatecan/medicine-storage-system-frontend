@@ -1,15 +1,31 @@
-<p-toast></p-toast>
+<p-toast/>
 <div class="kiosk-container">
   <!-- Header with authentication status -->
   <header class="kiosk-header">
     <div class="auth-status">
-      <div class="auth-indicator" [ngClass]="{'authenticated': isAuthenticated(), 'pending': isAuthenticating()}">
-        <i class="icon" [ngClass]="getAuthIcon()"></i>
-        <span class="status-text">{{ getAuthStatusText() }}</span>
+      <div class="auth-indicator"
+           [class.authenticated]="isUserAuthenticated()"
+           [class.pending]="isProcessing()">
+        @if (isUserAuthenticated()) {
+          <i class="icon fas fa-check-circle"></i>
+        } @else if (isProcessing()) {
+          <i class="icon fas fa-spinner fa-spin"></i>
+        } @else {
+          <i class="icon fas fa-times-circle"></i>
+        }
+        <span class="status-text">
+          @if (isUserAuthenticated()) {
+            Authenticated
+          } @else if (isProcessing()) {
+            Processing...
+          } @else {
+            Not Authenticated
+          }
+        </span>
       </div>
-      @if (authenticatedUser) {
+      @if (authenticatedUser()) {
         <div class="user-info">
-          <span class="welcome-text">Welcome, {{ authenticatedUser.name }}</span>
+          <span class="welcome-text">Welcome, {{ userName() }}</span>
         </div>
       }
     </div>
@@ -20,117 +36,267 @@
 
   <!-- Main content area -->
   <main class="kiosk-main">
-    <!-- Camera feed section -->
+    <!-- Left Column: Camera Section -->
     <section class="camera-section">
       <div class="camera-container">
         <video #videoElement class="camera-feed" autoplay muted playsinline></video>
 
-        <!-- Face detection bounding box overlay -->
-        @if (faceDetection) {
-          <div class="bounding-box face-box"
-               [style.left.px]="faceDetection.x"
-               [style.top.px]="faceDetection.y"
-               [style.width.px]="faceDetection.width"
-               [style.height.px]="faceDetection.height">
-            <span class="detection-label">{{ faceDetection.identity || 'Detecting...' }}</span>
-          </div>
-        }
-
         <!-- Medicine detection bounding boxes overlay -->
-        @for (medicine of medicineDetections(); track $index) {
-          <div class="bounding-box medicine-box"
-               [style.left.px]="medicine.bbox.x"
-               [style.top.px]="medicine.bbox.y"
-               [style.width.px]="medicine.bbox.width"
-               [style.height.px]="medicine.bbox.height">
-            <span class="detection-label">{{ medicine.name }}</span>
-          </div>
+        @for (detection of currentDetections(); track detection.id) {
+          <!-- Only show bounding box if coordinates are valid (not -1) -->
+          @if (detection.bbox.x >= 0 && detection.bbox.y >= 0 && detection.bbox.width > 0 && detection.bbox.height > 0) {
+            <div
+              class="bounding-box medicine-box"
+              [class.selected]="selectedMedicine() === detection"
+              [style.left.px]="detection.bbox.x"
+              [style.top.px]="detection.bbox.y"
+              [style.width.px]="detection.bbox.width"
+              [style.height.px]="detection.bbox.height"
+              (click)="selectMedicine(detection)"
+            >
+          <span class="detection-label"
+          >{{ detection.medicine?.name || detection.name }} ({{ (detection.confidence * 100).toFixed(1) }}%)</span
+          >
+            </div>
+          }
         }
       </div>
 
-      <!-- Camera status indicators -->
-      <div class="camera-status">
-        <div class="status-item">
-          <span class="status-label">Camera:</span>
-          <span class="status-value" [ngClass]="{'active': isCameraActive, 'inactive': !isCameraActive}">
-            {{ isCameraActive ? 'Active' : 'Inactive' }}
-          </span>
+      <!-- Camera controls -->
+      <div class="camera-controls">
+        <div class="status-indicators">
+          <div class="indicator">
+            <span class="label">Camera:</span>
+            {{ isCameraActive() ? 'Active' : 'Inactive' }}
+          </div>
+          <div class="indicator">
+            <span class="label">Status:</span>
+            {{ isProcessing() ? 'Processing...' : 'Ready' }}
+          </div>
         </div>
-        <div class="status-item">
-          <span class="status-label">Processing:</span>
-          <span class="status-value" [ngClass]="{'processing': isProcessing}">
-            {{ isProcessing ? 'Processing...' : 'Ready' }}
-          </span>
+
+        <div class="control-buttons">
+          <button type="button" class="control-btn" (click)="refreshCamera()">
+            <i class="fas fa-refresh"></i> Refresh Camera
+          </button>
         </div>
       </div>
-    </section>
 
-    <!-- Instructions panel -->
-    <section class="instructions-section">
-      @if (!isAuthenticated()) {
-        <div class="instruction-card">
-          <h3>Step 1: Face Authentication</h3>
-          <p>Please position your face in front of the camera for authentication.</p>
-          <ul>
-            <li>Look directly at the camera</li>
-            <li>Ensure good lighting</li>
-            <li>Wait for recognition</li>
-          </ul>
+      <!-- Instructions panel for non-authenticated users -->
+      @if (!isUserAuthenticated()) {
+        <div class="instructions-panel">
+          <h3>Instructions</h3>
+          <ol>
+            <li>Position your face in front of the camera</li>
+            <li>Wait for face recognition to complete</li>
+            <li>Once authenticated, place medicines in the camera view</li>
+            <li>Select detected medicines to manage storage</li>
+          </ol>
         </div>
       }
 
-      @if (isAuthenticated() && currentMode === 'medicine') {
-        <h3>Step 2: Medicine Detection</h3>
-        <p>Hold the medicine package in front of the camera for identification.</p>
-        <ul>
-          <li>Hold the medicine clearly visible</li>
-          <li>Ensure the label is readable</li>
-          <li>Wait for classification</li>
-        </ul>
+      <!-- Medicine detection panel for authenticated users -->
+      @if (isUserAuthenticated()) {
+        <div class="medicine-panel">
+          <h3>Medicine Detection</h3>
+          <p>Place medicines in front of the camera to detect them automatically.</p>
+        </div>
       }
     </section>
 
-    <!-- Medicine detection results -->
-    @if (isAuthenticated()) {
-      <section class="results-section">
-        <h3>Detection Results</h3>
-        @if (medicineDetections().length > 0) {
-          <div class="medicine-results">
-            @for (medicine of medicineDetections(); track $index) {
-              <div class="medicine-item">
-                <div class="medicine-info">
-                  <h4>{{ medicine.name }}</h4>
-                  <p class="medicine-details">{{ medicine.details }}</p>
-                  <div class="confidence-scores">
-                    <span class="confidence detection">Detection: {{ (medicine.confidence * 100).toFixed(1) }}%</span>
-                    <span
-                      class="confidence classification">Classification: {{ (medicine.classifyConfidence * 100).toFixed(1) }}
-                      %</span>
+    <!-- Right Column: Control Panel Section -->
+    <section class="control-panel">
+      <!-- Show welcome message for authenticated users -->
+      @if (isUserAuthenticated()) {
+        <div class="panel-header">
+          <h2>Detection Results ({{ detectionCount() }})</h2>
+          @if (currentDetections().length > 0) {
+            <button
+              type="button"
+              class="action-btn clear-btn"
+              (click)="logout()"
+              title="Clear all detections"
+            >
+              <i class="fas fa-trash"></i> Clear All
+            </button>
+          }
+        </div>
+
+        <!-- Detection list -->
+        @if (currentDetections().length > 0) {
+          <div class="detection-list">
+            @for (detection of currentDetections(); track detection.id) {
+              <div
+                class="detection-item"
+                [class.selected]="selectedMedicine() === detection"
+                [class]="getMedicineStatusClass(detection)"
+              >
+                <div class="item-header" (click)="selectMedicine(detection)">
+                  <h4>{{ detection.medicine?.name || detection.name }}</h4>
+                  <span class="confidence">{{ (detection.confidence * 100).toFixed(1) }}%</span>
+                </div>
+                <p
+                  class="description">{{ detection.medicine?.description || detection.description || detection.details }}</p>
+
+                @if (userRole() === 'PHARMACIST' || userRole() === 'IT_ADMIN') {
+                  <div class="action-buttons">
+                    <button
+                      type="button"
+                      class="action-btn dispense-btn"
+                      (click)="dispenseMedicine(detection)"
+                      title="Dispense medicine"
+                    >
+                      <i class="fas fa-pills"></i> Dispense
+                    </button>
+
+                    <button
+                      type="button"
+                      class="action-btn add-btn"
+                      (click)="addToStorage(detection)"
+                      title="Add to storage"
+                    >
+                      <i class="fas fa-plus"></i> Add
+                    </button>
+
+                    <button
+                      type="button"
+                      class="action-btn remove-btn"
+                      (click)="removeFromDetection(detection)"
+                      title="Remove from detection"
+                    >
+                      <i class="fas fa-times"></i> Remove
+                    </button>
                   </div>
-                </div>
-                <div class="medicine-actions">
-                  <button class="btn-primary" (click)="dispenseMedicine(medicine)">
-                    Dispense
-                  </button>
-                </div>
+                }
               </div>
             }
           </div>
         } @else {
-          <p class="no-results">No medicine detected. Please hold a medicine package in front of the camera.</p>
+          <div class="no-detections">
+            <p>No medicines detected yet. Place medicines in front of the camera.</p>
+          </div>
         }
-      </section>
-    }
+      } @else {
+        <!-- Show authentication prompt for non-authenticated users -->
+        <div class="auth-prompt">
+          <h2>Authentication Required</h2>
+          <p>Please position your face in front of the camera to begin using the system.</p>
+          <div class="auth-steps">
+            <div class="step">
+              <i class="fas fa-user-circle"></i>
+              <span>Step 1: Face Recognition</span>
+            </div>
+            <div class="step">
+              <i class="fas fa-pills"></i>
+              <span>Step 2: Medicine Detection</span>
+            </div>
+            <div class="step">
+              <i class="fas fa-check-circle"></i>
+              <span>Step 3: Manage Storage</span>
+            </div>
+          </div>
+        </div>
+      }
+    </section>
   </main>
 
-  <!-- Footer with system status -->
+  <!-- Footer -->
   <footer class="kiosk-footer">
     <div class="system-status">
-      <span class="status-indicator" [ngClass]="{'online': isSystemOnline, 'offline': !isSystemOnline}"></span>
-      <span>System Status: {{ isSystemOnline ? 'Online' : 'Offline' }}</span>
+      <span class="status-indicator"
+            [class.online]="systemStatus().isOnline"
+            [class.offline]="!systemStatus().isOnline"></span>
+      <span>System Status: {{ systemStatus().isOnline ? 'Online' : 'Offline' }}</span>
     </div>
-    <div class="last-updated">
-      Last updated: {{ lastUpdateTime | date:'short' }}
+    <div class="timestamp">Last updated: {{ formatTimestamp(systemStatus().lastSync) }}</div>
+
+    <div class="footer-controls">
+      <button
+        type="button"
+        class="footer-btn"
+        [class.active]="showAccessPanel()"
+        (click)="toggleAccessPanel()"
+      >
+        <i class="fas fa-history"></i> Access Log
+      </button>
+
+      <button
+        type="button"
+        class="footer-btn"
+        [class.active]="showSystemPanel()"
+        (click)="toggleSystemPanel()"
+      >
+        <i class="fas fa-cog"></i> System
+      </button>
+
+      @if (isUserAuthenticated()) {
+        <button type="button" class="footer-btn logout-btn" (click)="logout()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      }
     </div>
   </footer>
+
+  <!-- Access panel overlay -->
+  @if (showAccessPanel()) {
+    <div class="overlay-panel access-panel">
+      <div class="panel-content">
+        <div class="panel-header">
+          <h3>Recent Access Log</h3>
+          <button type="button" class="close-btn" (click)="toggleAccessPanel()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="access-list">
+          @for (log of accessLogs(); track log.id) {
+            <div class="access-item">
+              <div class="user-name">{{ log.email }}</div>
+              <div class="timestamp">{{ formatTimestamp(log.timestamp) }}</div>
+              <div class="action">{{ log.action }}</div>
+            </div>
+          } @empty {
+            <div class="no-data">No access logs available</div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- System panel overlay -->
+  @if (showSystemPanel()) {
+    <div class="overlay-panel system-panel">
+      <div class="panel-content">
+        <div class="panel-header">
+          <h3>System Information</h3>
+          <button type="button" class="close-btn" (click)="toggleSystemPanel()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="system-info">
+          <div class="info-item">
+            <span class="label">Status:</span>
+            <span
+              class="value"
+              [class.online]="systemStatus().isOnline"
+              [class.offline]="!systemStatus().isOnline"
+            >
+            {{ systemStatus().isOnline ? 'Online' : 'Offline' }}
+          </span>
+          </div>
+          <div class="info-item">
+            <span class="label">Last Sync:</span>
+            <span class="value">{{ formatTimestamp(systemStatus().lastSync) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">User:</span>
+            <span class="value">{{ userName() }} ({{ userRole() }})</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Detections:</span>
+            <span class="value">{{ detectionCount() }} active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 </div>
