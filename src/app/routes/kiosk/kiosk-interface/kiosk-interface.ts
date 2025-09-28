@@ -20,11 +20,7 @@ import { CameraService } from '../../../services/camera.service';
 import { FaceRecognitionService } from '../../../services/face-recognition.service';
 import { MedicineDetectionService } from '../../../services/medicine-detection.service';
 import { SystemService } from '../../../services/system-service/system-service';
-import {
-  AccessLog, MedicineDetection, MedicineInteractionResponse,
-  SystemStatus,
-  User
-} from '../../../services/types';
+import { AccessLog, MedicineDetection, MedicineInteractionResponse, SystemStatus, User } from '../../../services/types';
 import { MedicineService } from '../../../services/medicine-service/medicine-service';
 import { HttpErrorResponse } from '@angular/common/http';
 
@@ -49,7 +45,6 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
   private medicineService = inject(MedicineService);
 
   readonly authenticatedUser = signal<User | null>(null);
-  readonly currentDetections = signal<MedicineDetection[]>([]);
   readonly systemStatus = signal<SystemStatus>({ isOnline: false, lastSync: new Date() });
   readonly accessLogs = signal<AccessLog[]>([]);
   readonly selectedMedicine = signal<MedicineDetection | null>(null);
@@ -60,6 +55,8 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
     this.medicineDetectionService.isProcessing()
   );
 
+  readonly currentDetections = computed(() => this.medicineDetectionService.medicineDetections());
+
   readonly showAccessPanel = signal(false);
   readonly showSystemPanel = signal(false);
 
@@ -67,7 +64,6 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnInit() {
     this.updateSystemStatus();
-    this.subscribeToServices();
   }
 
   ngOnDestroy() {
@@ -89,7 +85,7 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
         summary: 'Camera Ready',
         detail: 'Camera initialized successfully'
       });
-    } catch(error) {
+    } catch (error) {
       console.error('Error initializing camera:', error);
       this.messageService.add({
         severity: 'error',
@@ -103,8 +99,8 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
     this.cameraService.startFrameProcessing(this.videoElement)
       .pipe(takeUntil(this.destroy$))
       .subscribe(frame => {
-        if(frame) {
-          this.processFrame(frame);
+        if (frame) {
+          this.processFrame(frame).then();
         }
       });
   }
@@ -112,18 +108,18 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
   private async processFrame(frame: ImageData) {
     try {
       let faceResult: User | null = null;
-      if(!this.isUserAuthenticated()) {
+      if (!this.isUserAuthenticated()) {
         console.error("Logging in...");
         faceResult = await this.faceRecognitionService.processFrame(frame)
       }
 
-      if(faceResult && !this.isUserAuthenticated()) {
+      if (faceResult && !this.isUserAuthenticated()) {
         let userRole = 'GUEST';
 
-        if(faceResult.role) {
-          if(faceResult.role.includes('IT_ADMIN') || faceResult.role.includes('admin')) {
+        if (faceResult.role) {
+          if (faceResult.role.includes('IT_ADMIN') || faceResult.role.includes('admin')) {
             userRole = 'IT_ADMIN';
-          } else if(faceResult.role.includes('PHARMACIST') || faceResult.role.includes('pharmacist')) {
+          } else if (faceResult.role.includes('PHARMACIST') || faceResult.role.includes('pharmacist')) {
             userRole = 'PHARMACIST';
           }
         }
@@ -131,56 +127,14 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
         this.authenticatedUser.update(() => faceResult);
         this.logAccess(faceResult);
       } else {
-        const medicineResults = await this.medicineDetectionService.processFrame(frame);
-        if(medicineResults && medicineResults.length > 0) {
-          this.updateDetections(medicineResults);
-        }
+        await this.medicineDetectionService.processFrameWithVideoElement(frame, this.videoElement);
       }
-    } catch(error) {
+    } catch (error) {
       console.error('Error processing frame:', error);
     }
   }
 
-  private updateDetections(newDetections: MedicineDetection[]) {
-    const currentDetections = this.currentDetections();
-    const updatedDetections = [...currentDetections];
 
-    newDetections.forEach(newDetection => {
-      const existingIndex = updatedDetections.findIndex(
-        existing => existing.id === newDetection.id
-      );
-
-      if(existingIndex >= 0) {
-        if(newDetection.confidence > updatedDetections[existingIndex].confidence) {
-          updatedDetections[existingIndex] = {
-            ...newDetection,
-            lastSeen: new Date()
-          };
-        }
-      } else {
-        // Add new detection
-        updatedDetections.push({
-          ...newDetection,
-          lastSeen: new Date()
-        });
-      }
-    });
-
-    // Remove old detections (older than 5 seconds)
-    // const now = new Date();
-    // const filteredDetections = updatedDetections.filter(detection => {
-    //   const timeDiff = now.getTime() - detection.lastSeen.getTime();
-    //   return timeDiff < 5000; // 5 seconds
-    // });
-    //
-    this.currentDetections.update(() => updatedDetections);
-  }
-
-  private subscribeToServices() {
-    // For now, we'll handle state updates manually during frame processing
-    // In a production app, these would be proper RxJS observables
-    console.log('Service subscriptions would be set up here');
-  }
 
   private logAccess(user: User) {
     const accessLog: AccessLog = {
@@ -197,9 +151,9 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
 
   private updateSystemStatus() {
     this.systemService.getSystemStatus().subscribe({
-      next: (status: {ok: boolean}) => {
+      next: (status: { status: boolean }) => {
         this.systemStatus.set({
-          isOnline: status.ok,
+          isOnline: status.status,
           lastSync: new Date()
         });
       },
@@ -228,12 +182,12 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
 
   refreshCamera() {
     this.cameraService.stopCamera();
-    this.initializeCamera();
+    this.initializeCamera().then();
   }
 
   logout() {
     this.authenticatedUser.set(null);
-    this.currentDetections.set([]);
+    this.medicineDetectionService.resetDetections();
     this.selectedMedicine.set(null);
     this.showAccessPanel.set(false);
     this.showSystemPanel.set(false);
@@ -252,11 +206,11 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
     this.medicineService.dispenseMedicine(medicineName, 1).subscribe({
       next: (response) => {
         console.log('Medicine dispensed:', response);
-        this.removeFromDetection(detection);
+        this.medicineDetectionService.removeFromDetection(detection);
         this.messageService.add({
           severity: 'success',
           summary: 'Medicine Dispensed',
-          detail: `${ medicineName } has been dispensed from storage`,
+          detail: `${medicineName} has been dispensed from storage`,
           life: 3000
         });
       },
@@ -280,11 +234,11 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
     this.medicineService.addStock(medicineName, 1).subscribe({
       next: (response: MedicineInteractionResponse) => {
         console.log('Stock added:', response);
-        this.removeFromDetection(detection);
+        this.medicineDetectionService.removeFromDetection(detection);
         this.messageService.add({
           severity: 'success',
           summary: 'Medicine Added',
-          detail: `${ medicineName } has been added to storage`,
+          detail: `${medicineName} has been added to storage`,
           life: 3000
         });
       },
@@ -300,20 +254,17 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
   }
 
   removeFromDetection(detection: MedicineDetection) {
-    this.currentDetections.update(detections =>
-      detections.filter(d => d.id !== detection.id)
-    );
+    this.medicineDetectionService.removeFromDetection(detection);
 
-    if(this.selectedMedicine() === detection) {
+    if (this.selectedMedicine() === detection) {
       this.clearSelection();
     }
 
     const medicineName = detection.medicine?.name || detection.name;
-
     this.messageService.add({
       severity: 'info',
       summary: 'Detection Removed',
-      detail: `${ medicineName } removed from detection list`,
+      detail: `${medicineName} removed from detection list`,
       life: 2000
     });
   }
@@ -324,8 +275,8 @@ export class KioskInterface implements OnInit, OnDestroy, AfterViewInit {
   readonly userRole = computed(() => this.authenticatedUser()?.role || 'guest');
 
   getMedicineStatusClass(medicine: MedicineDetection): string {
-    if(medicine.confidence > 0.8) return 'high-confidence';
-    if(medicine.confidence > 0.6) return 'medium-confidence';
+    if (medicine.confidence > 0.8) return 'high-confidence';
+    if (medicine.confidence > 0.6) return 'medium-confidence';
     return 'low-confidence';
   }
 
