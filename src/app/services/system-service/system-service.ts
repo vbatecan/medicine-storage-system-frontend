@@ -14,4 +14,8 @@ export class SystemService {
   isSystemHealthy() {
     return this.http.get(`${this.API_URL}`);
   }
+
+  getSystemStatus() {
+    return this.http.get<{ok: boolean}>(`${this.API_URL}`);
+  }
 }

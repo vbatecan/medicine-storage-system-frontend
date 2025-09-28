@@ -2,7 +2,8 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { Observable } from 'rxjs';
-import { User, UserInput } from '../../models/interfaces';
+import { UserInput } from '../../models/io-types';
+import { User } from '../types';
 
 @Injectable({
   providedIn: 'root'
@@ -12,7 +13,7 @@ export class UserService {
   private readonly http = inject(HttpClient);
 
   getAllUsers(): Observable<User[]> {
-    return this.http.get<User[]>(`${this.API_URL}/users/all`);
+    return this.http.get<User[]>(`${ this.API_URL }/users/all`);
   }
 
   create(userInput: UserInput, selfieImage: File): Observable<User> {
@@ -24,14 +25,14 @@ export class UserService {
     formData.append('is_active', userInput.is_active.toString());
     formData.append('role', userInput.role);
     formData.append('selfie_image', selfieImage);
-    return this.http.post<User>(`${this.API_URL}/users/create`, formData);
+    return this.http.post<User>(`${ this.API_URL }/users/create`, formData);
   }
 
   delete(userId: number) {
-    return this.http.delete<User>(`${this.API_URL}/users/delete/${userId}`);
+    return this.http.delete<User>(`${ this.API_URL }/users/delete/${ userId }`);
   }
 
   toggleUserActiveStatus(userId: number, isActive: boolean) {
-    return this.http.patch<User>(`${this.API_URL}/users/toggle-active/${userId}`, { is_active: isActive });
+    return this.http.patch<User>(`${ this.API_URL }/users/toggle-active/${ userId }`, { is_active: isActive });
   }
 }
