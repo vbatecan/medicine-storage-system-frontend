@@ -5,10 +5,11 @@ import { UserService } from '../../../services/user-service/user-service';
 import { UserInput } from '../../../models/io-types';
 import { HttpErrorResponse } from '@angular/common/http';
 import { User } from '../../../services/types';
+import { ItAdminNavigation } from '../it-admin-navigation/it-admin-navigation';
 
 @Component({
   selector: 'app-it-admin-home',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ItAdminNavigation],
   templateUrl: './it-admin-home.html',
   styleUrl: './it-admin-home.css'
 })

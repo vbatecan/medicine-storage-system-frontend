@@ -1,1 +1,123 @@
-<p>it-admin-transactions-history works!</p>
+<div class="it-admin-container">
+  <!-- Navigation -->
+  <app-it-admin-navigation></app-it-admin-navigation>
+
+  <div class="header">
+    <h1>Transaction History</h1>
+    <p>View all medicine dispensing and inventory transactions</p>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <p-button
+      label="Refresh"
+      icon="fas fa-sync-alt"
+      [loading]="loading()"
+      (onClick)="refreshTransactions()"
+      severity="secondary">
+    </p-button>
+  </div>
+
+  <!-- Error Message -->
+  @if (error()) {
+    <div class="error-message">
+      <i class="fas fa-exclamation-triangle"></i>
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (loading() && !hasTransactions()) {
+    <div class="loading-message">
+      <i class="fas fa-spinner fa-spin"></i>
+      Loading transaction history...
+    </div>
+  }
+
+  <!-- Transactions Table -->
+  @if (hasTransactions() || loading()) {
+    <p-card class="transactions-card">
+      <p-table
+        [value]="transactions()"
+        [loading]="loading()"
+        [rows]="pageSize()"
+        [totalRecords]="totalRecords()"
+        [rowsPerPageOptions]="pageSizeOptions"
+        [lazy]="false"
+        (onPage)="onPageChange($event)"
+        class="p-datatable-striped">
+
+        <ng-template pTemplate="header">
+          <tr>
+            <th pSortableColumn="id">ID <p-sortIcon field="id"></p-sortIcon></th>
+            <th pSortableColumn="user.face_name">User <p-sortIcon field="user.face_name"></p-sortIcon></th>
+            <th pSortableColumn="transaction_detail.medicine.name">Medicine <p-sortIcon field="transaction_detail.medicine.name"></p-sortIcon></th>
+            <th pSortableColumn="transaction_detail.quantity">Quantity <p-sortIcon field="transaction_detail.quantity"></p-sortIcon></th>
+            <th pSortableColumn="mode">Type <p-sortIcon field="mode"></p-sortIcon></th>
+            <th pSortableColumn="created_at">Date <p-sortIcon field="created_at"></p-sortIcon></th>
+          </tr>
+        </ng-template>
+
+        <ng-template pTemplate="body" let-transaction>
+          <tr>
+            <td>{{ transaction.id || 'N/A' }}</td>
+            <td>
+              <div class="user-info">
+                <div class="user-name">{{ transaction.user.face_name }}</div>
+                <div class="user-email">{{ transaction.user.email }}</div>
+              </div>
+            </td>
+            <td>
+              <div class="medicine-info">
+                <div class="medicine-name">{{ transaction.transaction_detail.medicine.name }}</div>
+                <div class="medicine-description">{{ transaction.transaction_detail.medicine.description }}</div>
+              </div>
+            </td>
+            <td>
+              <span class="quantity-badge">{{ transaction.transaction_detail.quantity }}</span>
+            </td>
+            <td>
+              <p-tag
+                [value]="getInventoryModeLabel(transaction.mode)"
+                [severity]="getInventoryModeSeverity(transaction.mode)"
+                [icon]="transaction.mode === 'IN' ? 'fas fa-arrow-up' : 'fas fa-arrow-down'">
+              </p-tag>
+            </td>
+            <td>
+              <div class="date-info">
+                <div class="date-primary">{{ formatDate(transaction.created_at) }}</div>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="6" class="text-center">
+              <div class="empty-message">
+                <i class="fas fa-inbox" style="font-size: 2rem; color: var(--text-color-secondary);"></i>
+                <h4>No Transactions Found</h4>
+                <p>There are no transaction records to display.</p>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+  }
+
+  <!-- Empty State (when not loading and no transactions) -->
+  @if (!loading() && !hasTransactions() && !error()) {
+    <div class="empty-state">
+      <i class="fas fa-history" style="font-size: 3rem; color: var(--text-color-secondary); margin-bottom: 1rem;"></i>
+      <h3>No Transaction History</h3>
+      <p>No transaction records are available at this time.</p>
+      <p-button
+        label="Refresh"
+        icon="fas fa-sync-alt"
+        (onClick)="refreshTransactions()"
+        severity="secondary">
+      </p-button>
+    </div>
+  }
+</div>
