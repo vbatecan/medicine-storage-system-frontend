@@ -6,6 +6,7 @@ import { LoginResponse } from '../../models/responses';
 import { MessageService } from 'primeng/api';
 import { Toast } from 'primeng/toast';
 import { UserRole } from '../../services/types';
+import { Button } from "primeng/button";
 
 export interface LoginFormData {
   email: string;
@@ -19,7 +20,7 @@ export interface FormFieldError {
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, Toast],
+  imports: [ReactiveFormsModule, Toast, Button],
   templateUrl: './login.html',
   styleUrl: './login.css',
   providers: [
@@ -135,5 +136,9 @@ export class Login implements OnInit {
   isFieldInvalid(fieldName: string): boolean {
     const control = fieldName === 'email' ? this.form().loginForm.get('email') : this.form().loginForm.get('password');
     return !!(control?.touched && control.errors);
+  }
+
+  navigateToKiosk(): void {
+    this.router.navigate(['/kiosk/interface']);
   }
 }
