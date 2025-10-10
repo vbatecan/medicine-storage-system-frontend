@@ -14,6 +14,10 @@ export const routes: Routes = [
     loadComponent: () => import('./routes/it-admin/it-admin-home/it-admin-home').then(m => m.ItAdminHome)
   },
   {
+    path: 'it-admin/transactions',
+    loadComponent: () => import('./routes/it-admin/it-admin-transactions-history/it-admin-transactions-history').then(m => m.ItAdminTransactionsHistory)
+  },
+  {
     path: 'login',
     loadComponent: () => import('./routes/login/login').then(m => m.Login)
   },
