@@ -1,9 +1,7 @@
-import { Component, signal, computed, inject, ViewChild, ElementRef } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { Component, computed, ElementRef, inject, signal, ViewChild } from '@angular/core';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { MessageService, ConfirmationService } from 'primeng/api';
-import { Table } from 'primeng/table';
-import { TableModule } from 'primeng/table';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { DialogModule } from 'primeng/dialog';
@@ -14,11 +12,12 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
-import { Medicine, MedicineFormData, FileSelectEvent, StockSeverity, CreateMedicineRequest } from '../../../models/io-types';
+import { CreateMedicineRequest, FileSelectEvent, Medicine, StockSeverity } from '../../../models/io-types';
 import { TextareaModule } from 'primeng/textarea';
 import { MedicineService } from '../../../services/medicine-service/medicine-service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
+import { TableModule } from 'primeng/table';
 
 @Component({
   selector: 'app-pharmacist-home',
@@ -26,7 +25,6 @@ import { environment } from '../../../../environments/environment';
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    TableModule,
     ButtonModule,
     CardModule,
     DialogModule,
@@ -37,14 +35,14 @@ import { environment } from '../../../../environments/environment';
     ToastModule,
     ConfirmDialogModule,
     TooltipModule,
-    TextareaModule
+    TextareaModule,
+    TableModule
   ],
   templateUrl: './pharmacist-home.component.html',
   styleUrls: ['./pharmacist-home.component.css'],
   providers: [MessageService, ConfirmationService]
 })
 export class PharmacistHomeComponent {
-  @ViewChild('medicineTable') medicineTable!: Table;
   @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
 
   private readonly API_URL = environment.apiUrl;
@@ -85,7 +83,7 @@ export class PharmacistHomeComponent {
           response.map(medicine => {
             return {
               ...medicine,
-              image_path: `${this.API_URL}/medicines/${medicine.image_path}`
+              image_path: `${ this.API_URL }/medicines/${ medicine.image_path }`
             }
           })
         );
@@ -124,7 +122,7 @@ export class PharmacistHomeComponent {
 
   deleteMedicine(medicine: Medicine): void {
     this.confirmationService.confirm({
-      message: `Are you sure you want to delete ${medicine.name}?`,
+      message: `Are you sure you want to delete ${ medicine.name }?`,
       header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
@@ -280,9 +278,5 @@ export class PharmacistHomeComponent {
     if (stock === 0) return 'danger';
     if (stock <= 10) return 'warning';
     return 'success';
-  }
-
-  filterGlobal(value: string): void {
-    this.medicineTable.filterGlobal(value, 'contains');
   }
 }

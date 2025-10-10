@@ -3,6 +3,7 @@
 # User files
 .angular
 .vscode
+*.zip
 
 # Compiled output
 /dist
