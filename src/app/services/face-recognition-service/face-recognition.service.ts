@@ -32,8 +32,14 @@ export class FaceRecognitionService {
         `${ this.API_URL }/faces/recognize`,
         formData
       ));
+      console.log('Face recognition response:', response);
 
-      if (response[0].user.face_name) {
+      if (response.length <= 0) {
+        this.handleFailedAuthentication();
+        return;
+      }
+
+      if (response[0].user.face_name || response[0].identity) {
         this.handleSuccessfulAuthentication(response[0]);
       } else {
         this.handleFailedAuthentication();
