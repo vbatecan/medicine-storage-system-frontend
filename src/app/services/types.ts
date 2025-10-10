@@ -107,10 +107,19 @@ export interface Medicine {
   image_path?: string;
 }
 
+export interface TransactionDetail {
+  id: number;
+  medicine: Medicine;
+  quantity: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface Transaction {
   id?: number;
   user: User;
   mode: InventoryMode;
+  transaction_detail: TransactionDetail;
   created_at: Date;
   updated_at: Date;
 }

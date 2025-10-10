@@ -2,8 +2,8 @@ import { ElementRef, inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { MessageService } from 'primeng/api';
-import { environment } from '../../environments/environment';
-import { FaceDetection, FaceDetectionResult, FaceRecognitionResponse, User } from './types';
+import { environment } from '../../../environments/environment';
+import { FaceDetection, FaceDetectionResult, FaceRecognitionResponse, User } from '../types';
 
 @Injectable({
   providedIn: 'root'
@@ -33,15 +33,13 @@ export class FaceRecognitionService {
         formData
       ));
 
-      console.log("Face Recognition Response: ", response);
-
-      if(response?.length && response[0].identity) {
+      if (response[0].user.face_name) {
         this.handleSuccessfulAuthentication(response[0]);
       } else {
         this.handleFailedAuthentication();
       }
 
-    } catch(error) {
+    } catch (error) {
       console.error('Face recognition API error:', error);
       this.handleFailedAuthentication();
     } finally {
@@ -95,11 +93,11 @@ export class FaceRecognitionService {
     videoWidth: number,
     videoHeight: number
   ): void {
-    if(response.face && videoElement && videoElement.nativeElement) {
+    if (response.face && videoElement && videoElement.nativeElement) {
       const video = videoElement.nativeElement;
 
       // Ensure the video element is properly loaded and has dimensions
-      if(!video.getBoundingClientRect) {
+      if (!video.getBoundingClientRect) {
         console.warn('Video element does not support getBoundingClientRect');
         return;
       }
@@ -107,7 +105,7 @@ export class FaceRecognitionService {
       const videoRect = video.getBoundingClientRect();
 
       // Ensure we have valid dimensions
-      if(videoRect.width === 0 || videoRect.height === 0) {
+      if (videoRect.width === 0 || videoRect.height === 0) {
         console.warn('Video element has zero dimensions');
         return;
       }
@@ -146,9 +144,9 @@ export class FaceRecognitionService {
    * Get authentication status icon class
    */
   getAuthIcon(): string {
-    if(this.isAuthenticated()) {
+    if (this.isAuthenticated()) {
       return 'fas fa-check-circle';
-    } else if(this.isAuthenticating()) {
+    } else if (this.isAuthenticating()) {
       return 'fas fa-spinner fa-spin';
     } else {
       return 'fas fa-user-circle';
@@ -159,9 +157,9 @@ export class FaceRecognitionService {
    * Get authentication status text
    */
   getAuthStatusText(): string {
-    if(this.isAuthenticated()) {
+    if (this.isAuthenticated()) {
       return 'Authenticated';
-    } else if(this.isAuthenticating()) {
+    } else if (this.isAuthenticating()) {
       return 'Authenticating...';
     } else {
       return 'Not Authenticated';
@@ -184,13 +182,13 @@ export class FaceRecognitionService {
       canvas.width = frame.width;
       canvas.height = frame.height;
       const ctx = canvas.getContext('2d');
-      if(!ctx) return null;
+      if (!ctx) return null;
 
       ctx.putImageData(frame, 0, 0);
 
       return new Promise((resolve) => {
-        canvas.toBlob(async(blob) => {
-          if(blob) {
+        canvas.toBlob(async (blob) => {
+          if (blob) {
             await this.processFaceRecognition(blob);
             resolve(this.authenticatedUser());
           } else {
@@ -198,7 +196,7 @@ export class FaceRecognitionService {
           }
         }, 'image/jpeg', 0.8);
       });
-    } catch(error) {
+    } catch (error) {
       console.error('Error processing frame for face recognition:', error);
       return null;
     }

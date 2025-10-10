@@ -2,8 +2,8 @@ import { Injectable, inject, ElementRef, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { MessageService } from 'primeng/api';
-import { environment } from '../../environments/environment';
-import { MedicineDetectionResponse, MedicineDetection } from './types';
+import { environment } from '../../../environments/environment';
+import { MedicineDetectionResponse, MedicineDetection } from '../types';
 
 @Injectable({
   providedIn: 'root'

@@ -6,7 +6,6 @@ import { VideoConstraints } from './types';
   providedIn: 'root'
 })
 export class CameraService {
-  // Camera properties
   videoWidth = 640;
   videoHeight = 480;
   isCameraActive = signal(false);
@@ -15,8 +14,7 @@ export class CameraService {
   private mediaStream: MediaStream | null = null;
   private frameProcessing$ = new Subject<void>();
 
-  // Configuration
-  private readonly FRAME_PROCESSING_INTERVAL = 1000; // Process frame every 1 second
+  private readonly FRAME_PROCESSING_INTERVAL = 1000;
 
   /**
    * Initialize camera and start video stream
@@ -66,7 +64,6 @@ export class CameraService {
     return interval(this.FRAME_PROCESSING_INTERVAL)
       .pipe(takeUntil(this.frameProcessing$))
       .pipe(
-        // Map to frame data
         map(() => {
           if (this.isCameraActive() && !this.isProcessing()) {
             return this.captureFrameAsImageData(videoElement);
